@@ -1,5 +1,6 @@
 #!/bin/python
 import argparse
+from os import error
 import socket
 from typing import List
 
@@ -24,15 +25,28 @@ def main():
     parser.add_argument("--host", help="target host, should be IPv4 or hostname", required=True, type=str)
     parser.add_argument("--port", help="target ports, separated by a space", nargs="+", required=True, type=int)
     args = parser.parse_args()
-    host = socket.gethostbyname(args.host)
+    host = args.host
     port = args.port
+    # 尝试域名解析
+    try:
+        host = socket.gethostbyname(host)
+    except:
+        print(f"Error: Cannot resolve '{args.host}': Unknown host")
+        return
+    print(f"Scan results for: {host}")
+    # 端口扫描
     for p in port:
         if tcp_connect_test(host, p):
-            print(f"[+] {p}/tcp open")
+            print(f"[+] {p:>5}/tcp \topen")
         else:
-            print(f"[-] {p}/tcp closed")
+            print(f"[-] {p:>5}/tcp \tclosed")
 
 
 if __name__ == "__main__":
     main()
-    # e.g. python .\port-scan.py --host baidu.com --port 80 443 9999
+    # e.g.
+    # python .\port-scan.py --host baidu.com --port 80 443 9999
+    # Scan results for: 220.181.38.251
+    # [+]    80/tcp   open
+    # [+]   443/tcp   open
+    # [-]  9999/tcp   closed
