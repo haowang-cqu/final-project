@@ -68,8 +68,13 @@ DWORD proc(LPVOID lpThreadParameter)
     if (role == -1)
     {
         printf("client [%d] verification failed\n", id);
+        send(clientSocket[id], "faild", 5, 0);
         closesocket(clientSocket[id]);
         clientSocket[id] = NULL;
+    }
+    else 
+    {
+        send(clientSocket[id], "success", 7, 0);
     }
     printf("the role of client [%d] is %d\n", id, role);
     char buf[BUFFER_SIZE];
