@@ -1,18 +1,18 @@
 /**
- * æœåŠ¡ç«¯
+ * ·şÎñ¶Ë
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
+#include "des.h"
 #pragma comment(lib, "ws2_32.lib")
 
 #define HOST "127.0.0.1"
 #define PORT 23333
 #define MAX_CLIENT 1024
 #define BUFFER_SIZE 1024
-#define LOW_PASSWORD "123456"        // ä½çº§åˆ«æƒé™å¯†ç 
-#define HIGH_PASSWORD "504yJb/mOCg=" // é«˜çº§åˆ«æƒé™å¯†ç 
+#define LOW_PASSWORD "123456" // µÍ¼¶±ğÈ¨ÏŞÃÜÂë
 
 typedef struct
 {
@@ -23,7 +23,7 @@ typedef struct
 Client clients[MAX_CLIENT];
 
 /**
- * å®¢æˆ·ç«¯ç™»å½•
+ * ¿Í»§¶ËµÇÂ¼
  */
 int login(int id)
 {
@@ -32,21 +32,35 @@ int login(int id)
     if (len > 0 && buf[0] == '0' && strcmp(buf + 1, LOW_PASSWORD) == 0)
     {
         send(clients[id].socket, "success", 7, 0);
-        clients[id].admin = 0; // æ‹¥æœ‰æ™®é€šç”¨æˆ·æƒé™
+        clients[id].admin = 0; // ÓµÓĞÆÕÍ¨ÓÃ»§È¨ÏŞ
         return 1;
     }
     send(clients[id].socket, "failed", 6, 0);
     return 0;
 }
 
+int adminLogin(char *command, int len)
+{
+    Block key, password;
+    if (len != 16)
+        return 0;
+    for (int i = 0; i < 8; i++)
+    {
+        key.c[i] = command[i];
+        password.c[i] = command[8 + i];
+    }
+    uint64_t cipher = des(password.l, key.l, e);
+    return cipher == 0x8e4fc7f03aa3a291;
+}
+
 /**
- * æ–‡ä»¶ä¸Šä¼ 
+ * ÎÄ¼şÉÏ´«
  */
 int fileUpload(const char *buf, int len)
 {
     char fileName[1024] = {0};
     int i;
-    // è§£ææ–‡ä»¶å
+    // ½âÎöÎÄ¼şÃû
     for (i = 0; i < len - 1; i++)
     {
         if (buf[i] == '\r' && buf[i + 1] == '\n')
@@ -54,7 +68,7 @@ int fileUpload(const char *buf, int len)
         else
             fileName[i] = buf[i];
     }
-    // æ–‡ä»¶é•¿åº¦ä¸º0
+    // ÎÄ¼ş³¤¶ÈÎª0
     if (len - (i + 2) < 1)
         return 0;
     FILE *fp = fopen(fileName, "wb");
@@ -64,7 +78,7 @@ int fileUpload(const char *buf, int len)
 }
 
 /**
- * æ‰§è¡Œå‘½ä»¤
+ * Ö´ĞĞÃüÁî
  */
 int runCommand(char *command)
 {
@@ -78,15 +92,15 @@ int runCommand(char *command)
 }
 
 /**
- * å®¢æˆ·ç«¯å‘½ä»¤å¤„ç†
+ * ¿Í»§¶ËÃüÁî´¦Àí
  */
 void commandHandler(int id, char *command, int len)
 {
     switch (command[0])
     {
-    // éªŒè¯é«˜çº§åˆ«æƒé™
+    // ÑéÖ¤¸ß¼¶±ğÈ¨ÏŞ
     case '1':
-        if (strcmp(command + 1, HIGH_PASSWORD) == 0)
+        if (clients[id].admin >= 0 && adminLogin(command + 1, len - 1))
         {
             clients[id].admin = 1;
             send(clients[id].socket, "success", 7, 0);
@@ -107,7 +121,7 @@ void commandHandler(int id, char *command, int len)
             send(clients[id].socket, "failed", 6, 0);
         }
         break;
-    // æ‰§è¡Œå‘½ä»¤
+    // Ö´ĞĞÃüÁî
     case 'r':
         if (clients[id].admin >= 0 && runCommand(command + 1))
         {
@@ -118,7 +132,7 @@ void commandHandler(int id, char *command, int len)
             send(clients[id].socket, "failed", 6, 0);
         }
         break;
-    // æ–‡ä»¶ä¸Šä¼ 
+    // ÎÄ¼şÉÏ´«
     case 'f':
         if (clients[id].admin >= 1 && fileUpload(command + 1, len - 1))
         {
@@ -136,13 +150,13 @@ void commandHandler(int id, char *command, int len)
 }
 
 /**
- * å’Œå®¢æˆ·ç«¯äº¤äº’çš„çº¿ç¨‹å‡½æ•°
+ * ºÍ¿Í»§¶Ë½»»¥µÄÏß³Ìº¯Êı
  */
 DWORD proc(LPVOID lpThreadParameter)
 {
     int id = (int)lpThreadParameter;
     printf("[INFO] client:%d connected\n", id);
-    // å®¢æˆ·ç«¯ç™»å½•éªŒè¯
+    // ¿Í»§¶ËµÇÂ¼ÑéÖ¤
     if (!login(id))
     {
         printf("[WARN] client:%d verification failed\n", id);
@@ -154,7 +168,7 @@ DWORD proc(LPVOID lpThreadParameter)
     {
         printf("[INFO] client:%d login successfully\n", id);
     }
-    // å®¢æˆ·ç«¯å‘½ä»¤è·å–
+    // ¿Í»§¶ËÃüÁî»ñÈ¡
     char buf[BUFFER_SIZE];
     int len;
     while (1)
@@ -178,7 +192,7 @@ DWORD proc(LPVOID lpThreadParameter)
 }
 
 /**
- * ç›‘å¬å®¢æˆ·ç«¯è¿æ¥å¹¶åˆ›å»ºé€šä¿¡çº¿ç¨‹
+ * ¼àÌı¿Í»§¶ËÁ¬½Ó²¢´´½¨Í¨ĞÅÏß³Ì
  */
 void server()
 {
@@ -186,19 +200,19 @@ void server()
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
     SOCKET serverSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    // æœåŠ¡ç«¯ç»‘å®šIPå’Œç«¯å£
+    // ·şÎñ¶Ë°ó¶¨IPºÍ¶Ë¿Ú
     SOCKADDR_IN serverAddr = {0};
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.S_un.S_addr = inet_addr(HOST);
     serverAddr.sin_port = htons(PORT);
     bind(serverSocket, (SOCKADDR *)&serverAddr, sizeof serverAddr);
-    // åˆå§‹åŒ–å®¢æˆ·ç«¯æ•°ç»„
+    // ³õÊ¼»¯¿Í»§¶ËÊı×é
     for (int i = 0; i < MAX_CLIENT; i++)
     {
         clients[i].socket = INVALID_SOCKET;
         clients[i].admin = -1;
     }
-    // ç›‘å¬å®¢æˆ·ç«¯çš„è¿æ¥è¯·æ±‚
+    // ¼àÌı¿Í»§¶ËµÄÁ¬½ÓÇëÇó
     printf("[INFO] listening on address %s port %d\n", HOST, PORT);
     listen(serverSocket, 20);
     SOCKADDR clientAddr = {0};
@@ -207,7 +221,7 @@ void server()
     {
         SOCKET temp = accept(serverSocket, (SOCKADDR *)&clientAddr, &size);
         int id = -1;
-        // è·å–ä¸€ä¸ªå¯ç”¨çš„ID
+        // »ñÈ¡Ò»¸ö¿ÉÓÃµÄID
         for (int i = 0; i < MAX_CLIENT; i++)
         {
             if (clients[i].socket == INVALID_SOCKET)
@@ -216,7 +230,7 @@ void server()
                 break;
             }
         }
-        // å½“è¿æ¥æ•°è¶…è¿‡ä¸Šé™æ—¶ç›´æ¥æŠŠè¿æ¥å…³é—­
+        // µ±Á¬½ÓÊı³¬¹ıÉÏÏŞÊ±Ö±½Ó°ÑÁ¬½Ó¹Ø±Õ
         if (id == -1)
         {
             printf("[WARN] Server is busy connecting\n");
@@ -224,7 +238,7 @@ void server()
             closesocket(temp);
             continue;
         }
-        // åˆ›å»ºå’Œå®¢æˆ·ç«¯é€šä¿¡çš„å­çº¿ç¨‹
+        // ´´½¨ºÍ¿Í»§¶ËÍ¨ĞÅµÄ×ÓÏß³Ì
         clients[id].socket = temp;
         CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)proc, (LPVOID)id, 0, NULL);
     }

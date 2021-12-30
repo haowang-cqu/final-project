@@ -1,3 +1,6 @@
 *.obj
 *.exe
 .vscode/*
+build
+build/*
+~*

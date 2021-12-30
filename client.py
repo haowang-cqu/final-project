@@ -1,24 +1,10 @@
 import socket
-from Crypto.Cipher import DES
 import base64
 import os
 
 host = "127.0.0.1"
 port = 23333
 buffer_size = 1024
-
-
-def des_encrypt(key: bytes, password: bytes) -> bytes:
-    """DES加密高级别权限密码
-    """
-    # 对密钥和待加密内容做padding
-    if len(key) < 8:
-        key += b"\x00" * (8 - len(key))
-    if len(password) % 8 != 0:
-        password += b"\x00" * (8 - len(password) % 8)
-    cipher = DES.new(key, DES.MODE_ECB)
-    ciphertext = cipher.encrypt(password)
-    return base64.b64encode(ciphertext)
 
 
 def login(conn: socket.socket) -> bool:
@@ -41,8 +27,11 @@ def command_handler(conn: socket.socket, command: str) -> None:
     if action == "admin":
         password = input("请输入高级别权限密码: ").strip().encode("utf-8")
         key = input("请输入加密密钥: ").strip().encode("utf-8")
-        high_password = des_encrypt(key, password)
-        conn.send(b"1" + high_password, 0)
+        if len(key) < 8:
+            key += b"\x00" * (8 - len(key))
+        if len(password) < 8:
+            password += b"\x00" * (8 - len(password))
+        conn.send(b"1" + key[:8] + password[:8], 0)
         is_success = conn.recv(buffer_size, 0)
         if is_success.decode("utf-8") != "success":
             print("验证失败")
