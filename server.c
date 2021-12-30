@@ -11,49 +11,128 @@
 #define PORT 23333
 #define MAX_CLIENT 1024
 #define BUFFER_SIZE 1024
-#define USER_TOKEN "123456" // 低级别权限密码
-#define ADMIN_TOKEN "654321" // 高级别权限密码
+#define LOW_PASSWORD "123456"        // 低级别权限密码
+#define HIGH_PASSWORD "504yJb/mOCg=" // 高级别权限密码
 
-SOCKET clientSocket[MAX_CLIENT];
-
-/**
- * 获取一个可用的客户端ID
- */
-int getClientId()
+typedef struct
 {
-    for (int i = 0; i < MAX_CLIENT; i++)
-    {
-        if (clientSocket[i] == NULL)
-            return i;
-    }
-    return -1;
-}
+    SOCKET socket;
+    int admin;
+} Client;
+
+Client clients[MAX_CLIENT];
 
 /**
  * 客户端登录
- * -1 失败
- *  0 低级别权限
- *  1 高级别权限
  */
 int login(int id)
 {
     char buf[BUFFER_SIZE] = {0};
-    int len = recv(clientSocket[id], buf, BUFFER_SIZE, NULL);
-    if (len > 0)
+    int len = recv(clients[id].socket, buf, BUFFER_SIZE, 0);
+    if (len > 0 && buf[0] == '0' && strcmp(buf + 1, LOW_PASSWORD) == 0)
     {
-        printf("recv[%d]: %s\n", len, buf);
-        // 低级别权限登录
-        if (buf[0] == '0' && strcmp(buf + 1, USER_TOKEN) == 0)
-        {
-            return 0;
-        }
-        // 高级别权限登录
-        if (buf[0] == '1' && strcmp(buf + 1, ADMIN_TOKEN) == 0)
-        {
-            return 1;
-        }
+        send(clients[id].socket, "success", 7, 0);
+        clients[id].admin = 0; // 拥有普通用户权限
+        return 1;
     }
-    return -1;
+    send(clients[id].socket, "failed", 6, 0);
+    return 0;
+}
+
+/**
+ * 文件上传
+ */
+int fileUpload(const char *buf, int len)
+{
+    char fileName[1024] = {0};
+    int i;
+    // 解析文件名
+    for (i = 0; i < len - 1; i++)
+    {
+        if (buf[i] == '\r' && buf[i + 1] == '\n')
+            break;
+        else
+            fileName[i] = buf[i];
+    }
+    // 文件长度为0
+    if (len - (i + 2) < 1)
+        return 0;
+    FILE *fp = fopen(fileName, "wb");
+    fwrite(buf + i + 2, sizeof(char), len - (i + 2), fp);
+    fclose(fp);
+    return 1;
+}
+
+/**
+ * 执行命令
+ */
+int runCommand(char *command)
+{
+    STARTUPINFO si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    if (!CreateProcessA(NULL, command, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    {
+        return 0;
+    }
+    return 1;
+}
+
+/**
+ * 客户端命令处理
+ */
+void commandHandler(int id, char *command, int len)
+{
+    switch (command[0])
+    {
+    // 验证高级别权限
+    case '1':
+        if (strcmp(command + 1, HIGH_PASSWORD) == 0)
+        {
+            clients[id].admin = 1;
+            send(clients[id].socket, "success", 7, 0);
+        }
+        else
+        {
+            send(clients[id].socket, "failed", 6, 0);
+        }
+        break;
+    // echo
+    case 'e':
+        if (clients[id].admin >= 0)
+        {
+            send(clients[id].socket, command + 1, len - 1, 0);
+        }
+        else
+        {
+            send(clients[id].socket, "failed", 6, 0);
+        }
+        break;
+    // 执行命令
+    case 'r':
+        if (clients[id].admin >= 0 && runCommand(command + 1))
+        {
+            send(clients[id].socket, "success", 7, 0);
+        }
+        else
+        {
+            send(clients[id].socket, "failed", 6, 0);
+        }
+        break;
+    // 文件上传
+    case 'f':
+        if (clients[id].admin >= 1 && fileUpload(command + 1, len - 1))
+        {
+            send(clients[id].socket, "success", 7, 0);
+        }
+        else
+        {
+            send(clients[id].socket, "failed", 6, 0);
+        }
+        break;
+    default:
+        send(clients[id].socket, "failed", 6, 0);
+        break;
+    }
 }
 
 /**
@@ -62,37 +141,36 @@ int login(int id)
 DWORD proc(LPVOID lpThreadParameter)
 {
     int id = (int)lpThreadParameter;
-    printf("client [%d] connected\n", id);
-    int role = login(id);
-    // 验证失败直接关闭连接
-    if (role == -1)
+    printf("[INFO] client:%d connected\n", id);
+    // 客户端登录验证
+    if (!login(id))
     {
-        printf("client [%d] verification failed\n", id);
-        send(clientSocket[id], "faild", 5, 0);
-        closesocket(clientSocket[id]);
-        clientSocket[id] = NULL;
+        printf("[WARN] client:%d verification failed\n", id);
+        closesocket(clients[id].socket);
+        clients[id].socket = INVALID_SOCKET;
+        return 0;
     }
-    else 
+    else
     {
-        send(clientSocket[id], "success", 7, 0);
+        printf("[INFO] client:%d login successfully\n", id);
     }
-    printf("the role of client [%d] is %d\n", id, role);
+    // 客户端命令获取
     char buf[BUFFER_SIZE];
     int len;
     while (1)
     {
         memset(buf, 0, BUFFER_SIZE);
-        len = recv(clientSocket[id], buf, BUFFER_SIZE, NULL);
-        printf("receive %d bytes from client [%d]\n", len, id);
+        len = recv(clients[id].socket, buf, BUFFER_SIZE, 0);
+        printf("[INFO] client:%d receive %d bytes\n", id, len);
         if (len > 0)
         {
-            send(clientSocket[id], buf, len, NULL);
+            commandHandler(id, buf, len);
         }
         else
         {
-            printf("client [%d] disconnected\n", id);
-            closesocket(clientSocket[id]);
-            clientSocket[id] = NULL;
+            printf("[INFO] client:%d disconnected\n", id);
+            closesocket(clients[id].socket);
+            clients[id].socket = INVALID_SOCKET;
             break;
         }
     }
@@ -114,24 +192,41 @@ void server()
     serverAddr.sin_addr.S_un.S_addr = inet_addr(HOST);
     serverAddr.sin_port = htons(PORT);
     bind(serverSocket, (SOCKADDR *)&serverAddr, sizeof serverAddr);
+    // 初始化客户端数组
+    for (int i = 0; i < MAX_CLIENT; i++)
+    {
+        clients[i].socket = INVALID_SOCKET;
+        clients[i].admin = -1;
+    }
     // 监听客户端的连接请求
+    printf("[INFO] listening on address %s port %d\n", HOST, PORT);
     listen(serverSocket, 20);
     SOCKADDR clientAddr = {0};
     int size = sizeof clientAddr;
     while (1)
     {
         SOCKET temp = accept(serverSocket, (SOCKADDR *)&clientAddr, &size);
-        int id = getClientId();
+        int id = -1;
+        // 获取一个可用的ID
+        for (int i = 0; i < MAX_CLIENT; i++)
+        {
+            if (clients[i].socket == INVALID_SOCKET)
+            {
+                id = i;
+                break;
+            }
+        }
         // 当连接数超过上限时直接把连接关闭
         if (id == -1)
         {
-            send(temp, busyMsg, strlen(busyMsg) + sizeof(char), NULL);
+            printf("[WARN] Server is busy connecting\n");
+            send(temp, "busy", 4, 0);
             closesocket(temp);
             continue;
         }
         // 创建和客户端通信的子线程
-        clientSocket[id] = temp;
-        CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)proc, (LPVOID)id, NULL, NULL);
+        clients[id].socket = temp;
+        CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)proc, (LPVOID)id, 0, NULL);
     }
 }
 
