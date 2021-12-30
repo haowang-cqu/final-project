@@ -24,6 +24,9 @@ typedef union
     uint64_t l;
 } Block;
 
+uint64_t initial_permutation(const uint64_t input);
+uint64_t final_permutation(const uint64_t input);
+uint32_t f_function(const uint32_t R, const uint64_t K);
 void key_generation(uint64_t key, uint64_t sub_keys[]);
 uint64_t des(uint64_t input, uint64_t key, mode_t mode);
 

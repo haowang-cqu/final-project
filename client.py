@@ -1,5 +1,4 @@
 import socket
-import base64
 import os
 
 host = "127.0.0.1"
@@ -28,9 +27,9 @@ def command_handler(conn: socket.socket, command: str) -> None:
         password = input("请输入高级别权限密码: ").strip().encode("utf-8")
         key = input("请输入加密密钥: ").strip().encode("utf-8")
         if len(key) < 8:
-            key += b"\x00" * (8 - len(key))
+            key += b"0" * (8 - len(key))
         if len(password) < 8:
-            password += b"\x00" * (8 - len(password))
+            password += b"0" * (8 - len(password))
         conn.send(b"1" + key[:8] + password[:8], 0)
         is_success = conn.recv(buffer_size, 0)
         if is_success.decode("utf-8") != "success":
@@ -90,5 +89,3 @@ def client():
 
 if __name__ == "__main__":
     client()
-    # print(des_encrypt(b"des@key", b"P@ssword"))
-    # 504yJb/mOCg=

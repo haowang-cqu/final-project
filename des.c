@@ -152,7 +152,7 @@ void key_generation(const uint64_t key, uint64_t sub_keys[])
  * @param input 置换前的数据块
  * @return 置换后的数据块
  */
-inline uint64_t initial_permutation(const uint64_t input)
+uint64_t initial_permutation(const uint64_t input)
 {
     uint64_t res = 0;
     for (int i = 0; i < 64; i++)
@@ -167,7 +167,7 @@ inline uint64_t initial_permutation(const uint64_t input)
  * @param input 置换前的数据块
  * @return 置换后的数据块
  */
-inline uint64_t final_permutation(const uint64_t input)
+uint64_t final_permutation(const uint64_t input)
 {
     uint64_t res = 0;
     for (int i = 0; i < 64; i++)
@@ -183,7 +183,7 @@ inline uint64_t final_permutation(const uint64_t input)
  * @param K 子密钥
  * @return f函数结果
  */
-inline uint32_t f_function(const uint32_t R, const uint64_t K)
+uint32_t f_function(const uint32_t R, const uint64_t K)
 {
     // E盒扩展32bit->48bit
     uint64_t expansion_res = 0;

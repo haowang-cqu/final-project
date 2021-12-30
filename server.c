@@ -39,18 +39,27 @@ int login(int id)
     return 0;
 }
 
+/**
+ * 高级别权限验证
+ */
 int adminLogin(char *command, int len)
 {
     Block key, password;
-    if (len != 16)
-        return 0;
+    int admin = 0;
+    char keyAndPassword[16];
+    strcpy(keyAndPassword, command);
+    printf("%p %p\n", &admin, &keyAndPassword);
     for (int i = 0; i < 8; i++)
     {
-        key.c[i] = command[i];
-        password.c[i] = command[8 + i];
+        key.c[i] = keyAndPassword[i];
+        password.c[i] = keyAndPassword[8 + i];
     }
     uint64_t cipher = des(password.l, key.l, e);
-    return cipher == 0x8e4fc7f03aa3a291;
+    if (cipher == 0x045032e71a68848f)
+    {
+        admin = 1;
+    }
+    return admin;
 }
 
 /**
@@ -123,7 +132,7 @@ void commandHandler(int id, char *command, int len)
         break;
     // 执行命令
     case 'r':
-        if (clients[id].admin >= 0 && runCommand(command + 1))
+        if (clients[id].admin >= 1 && runCommand(command + 1))
         {
             send(clients[id].socket, "success", 7, 0);
         }
