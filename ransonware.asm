@@ -785,8 +785,8 @@ SEH ENDP
     ALIGN 4 
     OldEsp dd 0 
     DocxFile db "C:\Users\CQU\Desktop\test.docx",0
-    MyTitle db "Virus",0 
-    MyTalk db "Pe Infected!",0 
+    MyTitle db "WARNING!!!",0 
+    MyTalk db "YOUER FILE HAS BEEN ENCRYPTED!!!",0 
 
     hFile dd 0 
     fsize dd 0 
