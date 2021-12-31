@@ -11,7 +11,7 @@
 #define HOST "127.0.0.1"
 #define PORT 23333
 #define MAX_CLIENT 1024
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 102400
 #define LOW_PASSWORD "123456" // 低级别权限密码
 
 typedef struct

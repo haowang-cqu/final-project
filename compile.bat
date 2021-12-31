@@ -1,0 +1,1 @@
+gcc .\server.c .\des.c -O0 -fno-stack-protector -m32 -lws2_32 -o server

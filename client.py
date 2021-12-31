@@ -3,7 +3,7 @@ import os
 
 host = "127.0.0.1"
 port = 23333
-buffer_size = 1024
+buffer_size = 102400
 
 
 def login(conn: socket.socket) -> bool:
